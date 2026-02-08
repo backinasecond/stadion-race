@@ -28,13 +28,39 @@
     <h1>400m Rundkurs – Pace Vergleich</h1>
 
     <div class="panel">
-      <div class="card">
-        <label for="paceA">Läufer A (min/km)</label>
-        <input id="paceA" value="5:00" />
+      <div id="runnersList" style="display:flex; gap:12px; align-items:flex-end;">
+        <div class="card">
+          <label for="pace1">Läufer 1 (min/km)</label>
+          <input id="pace1" class="paceInput" value="5:00" />
+        </div>
+        <div class="card">
+          <label for="pace2">Läufer 2 (min/km)</label>
+          <input id="pace2" class="paceInput" value="4:00" />
+        </div>
       </div>
+
       <div class="card">
-        <label for="paceB">Läufer B (min/km)</label>
-        <input id="paceB" value="4:00" />
+        <label for="numRunners">Anzahl Läufer</label>
+        <select id="numRunners">
+          <option value="2" selected>2</option>
+          <option value="3">3</option>
+          <option value="4">4</option>
+          <option value="5">5</option>
+          <option value="6">6</option>
+          <option value="7">7</option>
+          <option value="8">8</option>
+        </select>
+      </div>
+
+      <div class="card">
+        <label for="timeScale">Geschwindigkeit</label>
+        <select id="timeScale">
+          <option value="0.5">0.5×</option>
+          <option value="1" selected>1×</option>
+          <option value="2">2×</option>
+          <option value="4">4×</option>
+          <option value="8">8×</option>
+        </select>
       </div>
 
       <button id="startBtn">Start</button>
@@ -130,13 +156,13 @@
               Z"
             fill="none" opacity="0.0"></path>
 
-          <!-- Start/Ziel Linie (unten auf der Geraden) -->
-          <line x1="500" y1="430" x2="500" y2="370" stroke="#ffffff" stroke-width="5" opacity="0.95"></line>
-          <text x="512" y="405" fill="#ffffff" font-size="16" opacity="0.95">Start/Ziel</text>
+          <!-- Start/Ziel Linie (unten auf der Geraden) - verschoben weiter rechts wie bei echter Bahn -->
+          <line x1="660" y1="430" x2="660" y2="370" stroke="#ffffff" stroke-width="5" opacity="0.95"></line>
+          <text x="672" y="405" fill="#ffffff" font-size="16" opacity="0.95">Start/Ziel</text>
 
-          <!-- Läufer -->
-          <circle id="runnerA" r="10" fill="#7cf7a4"></circle>
-          <circle id="runnerB" r="10" fill="#ff7aa2"></circle>
+          <!-- Läufer (dynamisch erzeugt) - die statischen Beispiele werden ausgeblendet -->
+          <circle id="runnerA" r="10" fill="#7cf7a4" style="display:none"></circle>
+          <circle id="runnerB" r="10" fill="#ff7aa2" style="display:none"></circle>
 
           <!-- Legende -->
           <rect x="18" y="18" width="240" height="66" rx="12" fill="#0b1020" stroke="#22305f"></rect>
@@ -168,16 +194,16 @@
 
   function wrap01(x){ x = x % 1; return x < 0 ? x + 1 : x; }
 
-  const paceAEl = document.getElementById("paceA");
-  const paceBEl = document.getElementById("paceB");
+  // pace inputs (will be created/managed dynamically)
+  const numRunnersEl = document.getElementById("numRunners");
+  function getPaceEls() { return Array.from(document.querySelectorAll(".paceInput")); }
   const startBtn = document.getElementById("startBtn");
   const pauseBtn = document.getElementById("pauseBtn");
   const resetBtn = document.getElementById("resetBtn");
   const timesEl = document.getElementById("times");
   const gapEl = document.getElementById("gap");
+  const timeScaleEl = document.getElementById("timeScale");
 
-  const runnerA = document.getElementById("runnerA");
-  const runnerB = document.getElementById("runnerB");
   const lanePathA = document.getElementById("lanePathA");
   const lanePathB = document.getElementById("lanePathB");
 
@@ -187,8 +213,11 @@
 
   const LAP_M = 400;
 
-  let progA = 0, progB = 0;
-  let vA = 0, vB = 0;
+  // Runner state arrays (dynamic)
+  let progs = [];
+  let vs = [];
+  let runnerEls = []; // {circle, label}
+
   let running = false, paused = false, lastFrame = 0;
 
   function setPos(circleEl, t01, pathEl, pathLen) {
@@ -211,7 +240,7 @@
     return bestI / pathLen;
   }
 
-  const startRatio = findClosestRatioToPoint(500, 400, laneMain, lenMain);
+  const startRatio = findClosestRatioToPoint(660, 400, laneMain, lenMain);
 
   function fmtTime(sec){
     const m = Math.floor(sec / 60);
@@ -219,37 +248,81 @@
     return `${m}:${String(s).padStart(2,"0")}`;
   }
 
-  function recalc() {
-    const secA = parsePaceToSecPerKm(paceAEl.value);
-    const secB = parsePaceToSecPerKm(paceBEl.value);
+  const COLORS = ["#7cf7a4","#ff7aa2","#ffd36b","#6fd1ff","#cfa0ff","#ff9f7a","#9be27a","#63d0d8"];
 
-    if (!Number.isFinite(secA) || secA <= 0 || !Number.isFinite(secB) || secB <= 0) {
+  // Create SVG runner elements (circle + small number label)
+  function createSvgRunner(idx) {
+    const svg = laneMain.ownerSVGElement || document.querySelector('svg');
+    const cir = document.createElementNS('http://www.w3.org/2000/svg','circle');
+    cir.setAttribute('r', 10);
+    cir.setAttribute('fill', COLORS[idx % COLORS.length]);
+    cir.setAttribute('id', `runner_circle_${idx}`);
+    const txt = document.createElementNS('http://www.w3.org/2000/svg','text');
+    txt.setAttribute('fill','#070b17');
+    txt.setAttribute('font-size','12');
+    txt.setAttribute('font-weight','700');
+    txt.setAttribute('text-anchor','middle');
+    txt.setAttribute('dominant-baseline','middle');
+    txt.setAttribute('id', `runner_label_${idx}`);
+    txt.textContent = String(idx+1);
+    svg.appendChild(cir);
+    svg.appendChild(txt);
+    return {circle: cir, label: txt};
+  }
+
+  function removeExtraRunners() {
+    runnerEls.forEach(e => {
+      if (e.circle && e.circle.parentNode) e.circle.parentNode.removeChild(e.circle);
+      if (e.label && e.label.parentNode) e.label.parentNode.removeChild(e.label);
+    });
+    runnerEls = [];
+  }
+
+  function buildRunners(n) {
+    removeExtraRunners();
+    progs = new Array(n).fill(startRatio);
+    vs = new Array(n).fill(0);
+    for (let i=0;i<n;i++) runnerEls.push(createSvgRunner(i));
+  }
+
+  function recalc() {
+    const paceEls = getPaceEls();
+    const n = paceEls.length;
+    let ok = true;
+    for (let i=0;i<n;i++){
+      const sec = parsePaceToSecPerKm(paceEls[i].value);
+      if (!Number.isFinite(sec) || sec <= 0) { ok = false; break; }
+      vs[i] = 1000 / sec;
+    }
+    if (!ok) {
       timesEl.textContent = "Bitte Pace korrekt eingeben (z.B. 5:00 oder 4:35).";
       return false;
     }
-
-    vA = 1000 / secA; // m/s
-    vB = 1000 / secB;
-
-    const lapA = LAP_M / vA;
-    const lapB = LAP_M / vB;
-    timesEl.textContent = `A: ${fmtTime(lapA)} pro 400m  |  B: ${fmtTime(lapB)} pro 400m`;
+    // Anzeige: nur die ersten zwei Läufer wie bisher, sonst kurze Zusammenfassung
+    const lapTimes = vs.map(v => LAP_M / v);
+    if (n <= 2) {
+      timesEl.textContent = `A: ${fmtTime(lapTimes[0])} pro 400m  |  B: ${fmtTime(lapTimes[1])} pro 400m`;
+    } else {
+      timesEl.textContent = `Läufer: ${lapTimes.map(t=>fmtTime(t)).join(' | ')}`;
+    }
     return true;
   }
 
   function updateGap() {
-    // Abstand entlang der Bahn (vorwärts) + kleinster Abstand
-    const d = wrap01(progB - progA);      // [0,1)
-    const forward = d * LAP_M;
-    const backward = (1 - d) * LAP_M;
-    const shortest = Math.min(forward, backward);
-
-    let lead;
-    if (d === 0) lead = "Gleichauf";
-    else if (d <= 0.5) lead = `B ist vorne: +${forward.toFixed(1)} m`;
-    else lead = `A ist vorne: +${backward.toFixed(1)} m`;
-
-    gapEl.textContent = `${lead}  (kleinster Abstand: ${shortest.toFixed(1)} m)`;
+    // Bestimme Führenden und Abstände zu allen anderen (entlang Bahn)
+    if (progs.length === 0) { gapEl.textContent = '–'; return; }
+    // Führender = größter (negative Richtung) Fortschritt relativ zum Start
+    // Wir mappe auf [0,1) und wähle den kleinsten wrap distance zum Beginn
+    let leader = 0;
+    for (let i=1;i<progs.length;i++) if (progs[i] < progs[leader]) leader = i;
+    // Zeige Abstände (vorwärts) zum Führenden
+    const lines = [];
+    for (let i=0;i<progs.length;i++){
+      if (i===leader) continue;
+      const d = wrap01(progs[leader] - progs[i]); // wieviel der Führende vor dem i ist
+      lines.push(`L${leader+1} ± L${i+1}: ${ (d*LAP_M).toFixed(1) } m`);
+    }
+    gapEl.textContent = lines.length ? `${'Führender: L'+(leader+1)} — ${lines.join('  |  ')}` : 'Gleichauf';
   }
 
   function reset() {
@@ -258,10 +331,20 @@
     pauseBtn.disabled = true;
     pauseBtn.textContent = "Pause";
 
-    // Start/Ziel-Position ermitteln und beide Läufer dort platzieren
-    progA = startRatio; progB = startRatio;
-    setPos(runnerA, progA, laneMain, lenMain);
-    setPos(runnerB, progB, laneMain, lenMain);
+    // Start/Ziel-Position ermitteln und alle Läufer dort platzieren (mit kleinen Versätzen)
+    const n = progs.length || 2;
+    for (let i=0;i<n;i++){
+      // Keine Versetzung: alle Läufer exakt auf der Startlinie
+      progs[i] = wrap01(startRatio);
+      const el = runnerEls[i];
+      if (el) {
+        setPos(el.circle, progs[i], laneMain, lenMain);
+        // Label leicht oberhalb der Markierung
+        const p = laneMain.getPointAtLength(progs[i]*lenMain);
+        el.label.setAttribute('x', p.x);
+        el.label.setAttribute('y', p.y);
+      }
+    }
 
     timesEl.textContent = "–";
     gapEl.textContent = "–";
@@ -272,13 +355,22 @@
 
     const dt = (ts - lastFrame) / 1000;
     lastFrame = ts;
+    // apply time scale multiplier from UI
+    const speedMul = Number(timeScaleEl && timeScaleEl.value) || 1;
+    const adjDt = dt * speedMul;
 
     if (!paused) {
-      progA = wrap01(progA + (vA / LAP_M) * dt);
-      progB = wrap01(progB + (vB / LAP_M) * dt);
-
-      setPos(runnerA, progA, laneMain, lenMain);
-      setPos(runnerB, progB, laneMain, lenMain);
+      // Gegen den Uhrzeigersinn: negative Richtung entlang der Parametrisierung
+      for (let i=0;i<progs.length;i++){
+        progs[i] = wrap01(progs[i] - (vs[i] / LAP_M) * adjDt);
+        const el = runnerEls[i];
+        if (el) {
+          setPos(el.circle, progs[i], laneMain, lenMain);
+          const p = laneMain.getPointAtLength(progs[i]*lenMain);
+          el.label.setAttribute('x', p.x);
+          el.label.setAttribute('y', p.y);
+        }
+      }
       updateGap();
     }
 
@@ -303,11 +395,33 @@
 
   resetBtn.addEventListener("click", reset);
 
-  // initial: beide Läufer auf Start/Ziel platzieren
-  setPos(runnerA, startRatio, laneMain, lenMain);
-  setPos(runnerB, startRatio, laneMain, lenMain);
-  progA = startRatio; progB = startRatio;
-  updateGap();
+  // Rebuild UI/runner list when Anzahl geändert
+  numRunnersEl.addEventListener('change', ()=>{
+    const n = Number(numRunnersEl.value);
+    // ensure pace inputs exist
+    const list = document.getElementById('runnersList');
+    const existing = list.querySelectorAll('.paceInput');
+    for (let i=existing.length+1;i<=n;i++){
+      const card = document.createElement('div'); card.className='card';
+      const lab = document.createElement('label'); lab.setAttribute('for', 'pace'+i); lab.textContent = `Läufer ${i} (min/km)`;
+      const inp = document.createElement('input'); inp.id = 'pace'+i; inp.className='paceInput'; inp.value = i<=2 ? (i===1? '5:00':'4:00') : '5:30';
+      card.appendChild(lab); card.appendChild(inp);
+      list.appendChild(card);
+    }
+    // if reduced, remove extras
+    while (list.querySelectorAll('.paceInput').length > n) {
+      const last = list.lastElementChild; list.removeChild(last);
+    }
+    buildRunners(n);
+    // populate vs from input values
+    recalc();
+    reset();
+  });
+
+  // initial: setup runners according to default select
+  buildRunners(Number(numRunnersEl.value));
+  recalc();
+  reset();
 </script>
 </body>
 </html>
