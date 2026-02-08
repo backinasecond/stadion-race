@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>400m Vergleich – GitHub Pages</title>
+  <style>
+    :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+    body { margin: 0; background:#0b1020; color:#eef2ff; }
+    .wrap { max-width: 980px; margin: 0 auto; padding: 18px; }
+    h1 { font-size: 20px; margin: 0 0 12px; }
+    .panel { display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; margin: 10px 0 16px; }
+    .card { background:#121a33; border:1px solid #22305f; border-radius:12px; padding:12px; }
+    label { display:block; font-size:12px; opacity:.9; margin-bottom:6px; }
+    input { width: 120px; padding:8px 10px; border-radius:10px; border:1px solid #2b3b76; background:#0e1530; color:#eef2ff; }
+    button { padding:10px 14px; border-radius:12px; border:1px solid #2b3b76; background:#2b64ff; color:white; cursor:pointer; font-weight:600; }
+    button.secondary { background:#111a34; }
+    button:disabled { opacity:.6; cursor:not-allowed; }
+    .row { display:flex; gap:12px; flex-wrap:wrap; }
+    .info { font-size:13px; line-height:1.4; opacity:.95; }
+    .mono { font-variant-numeric: tabular-nums; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+
+    /* SVG container */
+    .stage { background:#0a0f22; border:1px solid #22305f; border-radius:16px; padding:12px; }
+    svg { width: 100%; height: auto; display:block; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>400m Rundkurs – Pace Vergleich</h1>
+
+    <div class="panel">
+      <div class="card">
+        <label for="paceA">Läufer A (min/km)</label>
+        <input id="paceA" inputmode="decimal" value="5:00" />
+      </div>
+      <div class="card">
+        <label for="paceB">Läufer B (min/km)</label>
+        <input id="paceB" inputmode="decimal" value="4:00" />
+      </div>
+      <div class="card">
+        <label for="fps">Update (Hz)</label>
+        <input id="fps" inputmode="numeric" value="60" />
+      </div>
+
+      <button id="startBtn">Start</button>
+      <button id="pauseBtn" class="secondary" disabled>Pause</button>
+      <button id="resetBtn" class="secondary">Reset</button>
+    </div>
+
+    <div class="row">
+      <div class="card info" style="flex:1; min-width:260px;">
+        <div><strong>Rundenzeiten (400m)</strong></div>
+        <div class="mono" id="times">–</div>
+        <div style="height:10px"></div>
+        <div><strong>Abstand entlang der Bahn</strong></div>
+        <div class="mono" id="gap">–</div>
+      </div>
+
+      <div class="stage" style="flex:3; min-width:320px;">
+        <svg viewBox="0 0 1000 520" aria-label="400m Bahn">
+          <!-- Hintergrund -->
+          <rect x="0" y="0" width="1000" height="520" fill="#070b17" rx="18"></rect>
+
+          <!-- Bahn (Oval) -->
+          <!-- Wir zeichnen eine "Rennbahn" als dicken Stroke auf einem Path -->
+          <path id="trackPath"
+                d="M 220 120
+                   A 140 140 0 0 1 220 400
+                   L 780 400
+                   A 140 140 0 0 1 780 120
+                   Z"
+                fill="none" stroke="#2b3b76" stroke-width="80" stroke-linecap="round" stroke-linejoin="round" opacity="0.95"></path>
+
+          <!-- Innenfläche -->
+          <path
+                d="M 260 150
+                   A 110 110 0 0 1 260 370
+                   L 740 370
+                   A 110 110 0 0 1 740 150
+                   Z"
+                fill="#0b1430" opacity="0.9"></path>
+
+          <!-- Linie als "Innenkante" -->
+          <path
+                d="M 260 150
+                   A 110 110 0 0 1 260 370
+                   L 740 370
+                   A 110 110 0 0 1 740 150
+                   Z"
+                fill="none" stroke="#445aa8" stroke-width="4" opacity="0.65"></path>
+
+          <!-- Start/Finish Markierung (oben links-ish) -->
+          <circle cx="220" cy="120" r="7" fill="#ffffff" opacity="0.9"></circle>
+          <text x="235" y="125" fill="#cdd6ff" font-size="16">Start</text>
+
+          <!-- Läuferpunkte -->
+          <circle id="runnerA" r="10" fill="#7cf7a4"></circle>
+          <circle id="runnerB" r="10" fill="#ff7aa2"></circle>
+
+          <!-- Legende -->
+          <rect x="18" y="18" width="220" height="66" rx="12" fill="#0b1020" stroke="#22305f"></rect>
+          <circle cx="40" cy="46" r="8" fill="#7cf7a4"></circle>
+          <text x="56" y="51" fill="#eef2ff" font-size="16">Läufer A</text>
+          <circle cx="140" cy="46" r="8" fill="#ff7aa2"></circle>
+          <text x="156" y="51" fill="#eef2ff" font-size="16">Läufer B</text>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+<script>
+  // ---- Helpers ----
+  function parsePaceToSecondsPerKm(str) {
+    // accepts "5:00" or "5.0" or "5" or "4:35"
+    const s = (str || "").trim();
+    if (!s) return NaN;
+
+    if (s.includes(":")) {
+      const [m, sec] = s.split(":");
+      const mm = Number(m.replace(",", "."));
+      const ss = Number((sec || "0").replace(",", "."));
+      if (!Number.isFinite(mm) || !Number.isFinite(ss)) return NaN;
+      return mm * 60 + ss;
+    }
+    const mins = Number(s.replace(",", "."));
+    if (!Number.isFinite(mins)) return NaN;
+    return mins * 60;
+  }
+
+  function clamp(n, a, b){ return Math.max(a, Math.min(b, n)); }
+
+  // Distance along track is normalized [0,1)
+  function wrap01(x){ x = x % 1; return x < 0 ? x + 1 : x; }
+
+  // ---- SVG path handling ----
+  const trackPath = document.getElementById("trackPath");
+  const pathLen = trackPath.getTotalLength();
+
+  function setRunnerPos(circleEl, t01) {
+    const p = trackPath.getPointAtLength(wrap01(t01) * pathLen);
+    circleEl.setAttribute("cx", p.x);
+    circleEl.setAttribute("cy", p.y);
+  }
+
+  // ---- UI elements ----
+  const paceAEl = document.getElementById("paceA");
+  const paceBEl = document.getElementById("paceB");
+  const fpsEl = document.getElementById("fps");
+  const startBtn = document.getElementById("startBtn");
+  const pauseBtn = document.getElementById("pauseBtn");
+  const resetBtn = document.getElementById("resetBtn");
+  const timesEl = document.getElementById("times");
+  const gapEl = document.getElementById("gap");
+  const runnerA = document.getElementById("runnerA");
+  const runnerB = document.getElementById("runnerB");
+
+  // ---- Simulation state ----
+  let running = false;
+  let paused = false;
+
+  let t0 = 0;
+  let lastFrame = 0;
+
+  // normalized progress around lap
+  let progA = 0;
+  let progB = 0;
+
+  // meters per second
+  let vA = 0;
+  let vB = 0;
+
+  // 400m lap is 400 meters
+  const LAP_M = 400;
+
+  function recalc() {
+    const secPerKmA = parsePaceToSecondsPerKm(paceAEl.value);
+    const secPerKmB = parsePaceToSecondsPerKm(paceBEl.value);
+
+    if (!Number.isFinite(secPerKmA) || secPerKmA <= 0 ||
+        !Number.isFinite(secPerKmB) || secPerKmB <= 0) {
+      timesEl.textContent = "Bitte Pace korrekt eingeben (z.B. 5:00 oder 4:35).";
+      return false;
+    }
+
+    vA = 1000 / secPerKmA; // m/s
+    vB = 1000 / secPerKmB;
+
+    const lapA = LAP_M / vA; // seconds
+    const lapB = LAP_M / vB;
+
+    const fmt = (sec) => {
+      const m = Math.floor(sec / 60);
+      const s = Math.round(sec - m * 60);
+      return `${m}:${String(s).padStart(2,"0")}`;
+    };
+
+    timesEl.textContent =
+      `A: ${fmt(lapA)} pro 400m  |  B: ${fmt(lapB)} pro 400m`;
+
+    return true;
+  }
+
+  function updateGap() {
+    // forward gap along track from A to B, and absolute smallest distance
+    const d = wrap01(progB - progA); // [0,1)
+    const metersForward = d * LAP_M;
+    const metersBackward = (1 - d) * LAP_M;
+    const shortest = Math.min(metersForward, metersBackward);
+
+    // also show signed "B ahead" if d in (0,0.5], else A ahead
+    let leadText;
+    if (d === 0) leadText = "Gleichauf";
+    else if (d <= 0.5) leadText = `B ist vorne: +${metersForward.toFixed(1)} m`;
+    else leadText = `A ist vorne: +${metersBackward.toFixed(1)} m`;
+
+    gapEl.textContent = `${leadText}  (kleinster Abstand: ${shortest.toFixed(1)} m)`;
+  }
+
+  function reset() {
+    running = false;
+    paused = false;
+    startBtn.disabled = false;
+    pauseBtn.disabled = true;
+    pauseBtn.textContent = "Pause";
+
+    progA = 0;
+    progB = 0;
+    setRunnerPos(runnerA, progA);
+    setRunnerPos(runnerB, progB);
+    updateGap();
+    recalc();
+  }
+
+  function tick(ts) {
+    if (!running) return;
+
+    const dt = (ts - lastFrame) / 1000;
+    lastFrame = ts;
+
+    if (!paused) {
+      // progress per second: (m/s) / 400m
+      progA = wrap01(progA + (vA / LAP_M) * dt);
+      progB = wrap01(progB + (vB / LAP_M) * dt);
+
+      setRunnerPos(runnerA, progA);
+      setRunnerPos(runnerB, progB);
+      updateGap();
+    }
+
+    requestAnimationFrame(tick);
+  }
+
+  startBtn.addEventListener("click", () => {
+    if (!recalc()) return;
+
+    running = true;
+    paused = false;
+    startBtn.disabled = true;
+    pauseBtn.disabled = false;
+    pauseBtn.textContent = "Pause";
+
+    lastFrame = performance.now();
+    requestAnimationFrame(tick);
+  });
+
+  pauseBtn.addEventListener("click", () => {
+    if (!running) return;
+    paused = !paused;
+    pauseBtn.textContent = paused ? "Weiter" : "Pause";
+  });
+
+  resetBtn.addEventListener("click", reset);
+
+  // initial positions
+  reset();
+</script>
+</body>
+</html>
