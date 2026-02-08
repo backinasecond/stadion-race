@@ -3,11 +3,11 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>400m Vergleich – GitHub Pages</title>
+  <title>400m Rundkurs – Pace Vergleich</title>
   <style>
     :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
     body { margin: 0; background:#0b1020; color:#eef2ff; }
-    .wrap { max-width: 980px; margin: 0 auto; padding: 18px; }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 18px; }
     h1 { font-size: 20px; margin: 0 0 12px; }
     .panel { display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; margin: 10px 0 16px; }
     .card { background:#121a33; border:1px solid #22305f; border-radius:12px; padding:12px; }
@@ -19,8 +19,6 @@
     .row { display:flex; gap:12px; flex-wrap:wrap; }
     .info { font-size:13px; line-height:1.4; opacity:.95; }
     .mono { font-variant-numeric: tabular-nums; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
-
-    /* SVG container */
     .stage { background:#0a0f22; border:1px solid #22305f; border-radius:16px; padding:12px; }
     svg { width: 100%; height: auto; display:block; }
   </style>
@@ -32,15 +30,11 @@
     <div class="panel">
       <div class="card">
         <label for="paceA">Läufer A (min/km)</label>
-        <input id="paceA" inputmode="decimal" value="5:00" />
+        <input id="paceA" value="5:00" />
       </div>
       <div class="card">
         <label for="paceB">Läufer B (min/km)</label>
-        <input id="paceB" inputmode="decimal" value="4:00" />
-      </div>
-      <div class="card">
-        <label for="fps">Update (Hz)</label>
-        <input id="fps" inputmode="numeric" value="60" />
+        <input id="paceB" value="4:00" />
       </div>
 
       <button id="startBtn">Start</button>
@@ -53,183 +47,224 @@
         <div><strong>Rundenzeiten (400m)</strong></div>
         <div class="mono" id="times">–</div>
         <div style="height:10px"></div>
-        <div><strong>Abstand entlang der Bahn</strong></div>
+        <div><strong>Abstand auf der Bahn</strong></div>
         <div class="mono" id="gap">–</div>
       </div>
 
-      <div class="stage" style="flex:3; min-width:320px;">
+      <div class="stage" style="flex:3; min-width:360px;">
         <svg viewBox="0 0 1000 520" aria-label="400m Bahn">
-          <!-- Hintergrund -->
           <rect x="0" y="0" width="1000" height="520" fill="#070b17" rx="18"></rect>
+          <defs>
+            <pattern id="tartan" patternUnits="userSpaceOnUse" width="24" height="24">
+              <rect width="24" height="24" fill="#9b1e2a"></rect>
+              <rect x="0" y="8" width="24" height="2" fill="#7c2238" opacity="0.9"></rect>
+              <rect x="8" y="0" width="2" height="24" fill="#7c2238" opacity="0.9"></rect>
+              <rect x="0" y="12" width="24" height="1" fill="#ffd24d" opacity="0.35"></rect>
+              <rect x="12" y="0" width="1" height="24" fill="#ffd24d" opacity="0.35"></rect>
+              <rect x="0" y="4" width="24" height="1" fill="#2b5fa8" opacity="0.25"></rect>
+              <rect x="4" y="0" width="1" height="24" fill="#2b5fa8" opacity="0.25"></rect>
+            </pattern>
+          </defs>
 
-          <!-- Bahn (Oval) -->
-          <!-- Wir zeichnen eine "Rennbahn" als dicken Stroke auf einem Path -->
-          <path id="trackPath"
-                d="M 220 120
-                   A 140 140 0 0 1 220 400
-                   L 780 400
-                   A 140 140 0 0 1 780 120
-                   Z"
-                fill="none" stroke="#2b3b76" stroke-width="80" stroke-linecap="round" stroke-linejoin="round" opacity="0.95"></path>
+          <!-- Parameter der Bahn (nur als Kommentar):
+               Außen:  Gerade von x=260..740 bei y=90/430, Kurvenradius=170
+               Innen:  Gerade von x=330..670 bei y=150/370, Kurvenradius=110
+          -->
 
-          <!-- Innenfläche -->
-          <path
-                d="M 260 150
-                   A 110 110 0 0 1 260 370
-                   L 740 370
-                   A 110 110 0 0 1 740 150
-                   Z"
-                fill="#0b1430" opacity="0.9"></path>
+          <!-- Infield (Rasen) = inneres Oval -->
+          <path id="infield"
+            d="M 330 150
+               L 670 150
+               A 110 110 0 0 1 670 370
+               L 330 370
+               A 110 110 0 0 1 330 150
+               Z"
+            fill="#1f7a3a" opacity="0.96"></path>
 
-          <!-- Linie als "Innenkante" -->
-          <path
-                d="M 260 150
-                   A 110 110 0 0 1 260 370
-                   L 740 370
-                   A 110 110 0 0 1 740 150
-                   Z"
-                fill="none" stroke="#445aa8" stroke-width="4" opacity="0.65"></path>
+          <!-- Tartan-Ring (außen - innen), korrektes Stadionoval -->
+          <path id="trackRing" fill-rule="evenodd"
+            d="M 260 90
+               L 740 90
+               A 170 170 0 0 1 740 430
+               L 260 430
+               A 170 170 0 0 1 260 90
+               Z
+               M 330 150
+               L 670 150
+               A 110 110 0 0 1 670 370
+               L 330 370
+               A 110 110 0 0 1 330 150
+               Z"
+            fill="url(#tartan)" opacity="0.98"></path>
 
-          <!-- Start/Finish Markierung (oben links-ish) -->
-          <circle cx="220" cy="120" r="7" fill="#ffffff" opacity="0.9"></circle>
-          <text x="235" y="125" fill="#cdd6ff" font-size="16">Start</text>
+          <!-- Innen-/Außenkante -->
+          <path d="M 260 90 L 740 90 A 170 170 0 0 1 740 430 L 260 430 A 170 170 0 0 1 260 90 Z"
+                fill="none" stroke="#ffffff" stroke-width="3" opacity="0.30"></path>
+          <path d="M 330 150 L 670 150 A 110 110 0 0 1 670 370 L 330 370 A 110 110 0 0 1 330 150 Z"
+                fill="none" stroke="#ffffff" stroke-width="3" opacity="0.55"></path>
 
-          <!-- Läuferpunkte -->
+          <!-- Bahnlinien (mehrere Ovale zwischen innen und außen) -->
+          <g opacity="0.75" fill="none" stroke="#ffffff" stroke-width="2">
+            <path d="M 318 140 L 682 140 A 120 120 0 0 1 682 380 L 318 380 A 120 120 0 0 1 318 140 Z"></path>
+            <path d="M 306 130 L 694 130 A 130 130 0 0 1 694 390 L 306 390 A 130 130 0 0 1 306 130 Z"></path>
+            <path d="M 294 120 L 706 120 A 140 140 0 0 1 706 400 L 294 400 A 140 140 0 0 1 294 120 Z"></path>
+            <path d="M 282 110 L 718 110 A 150 150 0 0 1 718 410 L 282 410 A 150 150 0 0 1 282 110 Z"></path>
+          </g>
+
+           <!-- Unsichtbare Laufwege für Läufer (beide auf derselben Bahn) -->
+          <path id="lanePathA"
+            d="M 306 130
+               L 694 130
+               A 130 130 0 0 1 694 390
+               L 306 390
+               A 130 130 0 0 1 306 130
+               Z"
+            fill="none"></path>
+           <!-- lanePathB bleibt im SVG zur Referenz, wird aber nicht für die Läufer verwendet -->
+           <path id="lanePathB"
+            d="M 282 110
+              L 718 110
+              A 150 150 0 0 1 718 410
+              L 282 410
+              A 150 150 0 0 1 282 110
+              Z"
+            fill="none" opacity="0.0"></path>
+
+          <!-- Start/Ziel Linie (unten auf der Geraden) -->
+          <line x1="500" y1="430" x2="500" y2="370" stroke="#ffffff" stroke-width="5" opacity="0.95"></line>
+          <text x="512" y="405" fill="#ffffff" font-size="16" opacity="0.95">Start/Ziel</text>
+
+          <!-- Läufer -->
           <circle id="runnerA" r="10" fill="#7cf7a4"></circle>
           <circle id="runnerB" r="10" fill="#ff7aa2"></circle>
 
           <!-- Legende -->
-          <rect x="18" y="18" width="220" height="66" rx="12" fill="#0b1020" stroke="#22305f"></rect>
+          <rect x="18" y="18" width="240" height="66" rx="12" fill="#0b1020" stroke="#22305f"></rect>
           <circle cx="40" cy="46" r="8" fill="#7cf7a4"></circle>
           <text x="56" y="51" fill="#eef2ff" font-size="16">Läufer A</text>
-          <circle cx="140" cy="46" r="8" fill="#ff7aa2"></circle>
-          <text x="156" y="51" fill="#eef2ff" font-size="16">Läufer B</text>
+          <circle cx="150" cy="46" r="8" fill="#ff7aa2"></circle>
+          <text x="166" y="51" fill="#eef2ff" font-size="16">Läufer B</text>
         </svg>
       </div>
     </div>
   </div>
 
 <script>
-  // ---- Helpers ----
-  function parsePaceToSecondsPerKm(str) {
-    // accepts "5:00" or "5.0" or "5" or "4:35"
-    const s = (str || "").trim();
+  // Pace parsing: "5:00" oder "4:35" oder "5" (min/km)
+  function parsePaceToSecPerKm(str) {
+    const s = (str || "").trim().replace(",", ".");
     if (!s) return NaN;
-
     if (s.includes(":")) {
       const [m, sec] = s.split(":");
-      const mm = Number(m.replace(",", "."));
-      const ss = Number((sec || "0").replace(",", "."));
+      const mm = Number(m);
+      const ss = Number(sec || "0");
       if (!Number.isFinite(mm) || !Number.isFinite(ss)) return NaN;
       return mm * 60 + ss;
     }
-    const mins = Number(s.replace(",", "."));
+    const mins = Number(s);
     if (!Number.isFinite(mins)) return NaN;
     return mins * 60;
   }
 
-  function clamp(n, a, b){ return Math.max(a, Math.min(b, n)); }
-
-  // Distance along track is normalized [0,1)
   function wrap01(x){ x = x % 1; return x < 0 ? x + 1 : x; }
 
-  // ---- SVG path handling ----
-  const trackPath = document.getElementById("trackPath");
-  const pathLen = trackPath.getTotalLength();
-
-  function setRunnerPos(circleEl, t01) {
-    const p = trackPath.getPointAtLength(wrap01(t01) * pathLen);
-    circleEl.setAttribute("cx", p.x);
-    circleEl.setAttribute("cy", p.y);
-  }
-
-  // ---- UI elements ----
   const paceAEl = document.getElementById("paceA");
   const paceBEl = document.getElementById("paceB");
-  const fpsEl = document.getElementById("fps");
   const startBtn = document.getElementById("startBtn");
   const pauseBtn = document.getElementById("pauseBtn");
   const resetBtn = document.getElementById("resetBtn");
   const timesEl = document.getElementById("times");
   const gapEl = document.getElementById("gap");
+
   const runnerA = document.getElementById("runnerA");
   const runnerB = document.getElementById("runnerB");
+  const lanePathA = document.getElementById("lanePathA");
+  const lanePathB = document.getElementById("lanePathB");
 
-  // ---- Simulation state ----
-  let running = false;
-  let paused = false;
+  // Beide Läufer folgen derselben Bahn (lanePathA). lanePathB bleibt nur als Referenz.
+  const laneMain = lanePathA;
+  const lenMain = laneMain.getTotalLength();
 
-  let t0 = 0;
-  let lastFrame = 0;
-
-  // normalized progress around lap
-  let progA = 0;
-  let progB = 0;
-
-  // meters per second
-  let vA = 0;
-  let vB = 0;
-
-  // 400m lap is 400 meters
   const LAP_M = 400;
 
-  function recalc() {
-    const secPerKmA = parsePaceToSecondsPerKm(paceAEl.value);
-    const secPerKmB = parsePaceToSecondsPerKm(paceBEl.value);
+  let progA = 0, progB = 0;
+  let vA = 0, vB = 0;
+  let running = false, paused = false, lastFrame = 0;
 
-    if (!Number.isFinite(secPerKmA) || secPerKmA <= 0 ||
-        !Number.isFinite(secPerKmB) || secPerKmB <= 0) {
+  function setPos(circleEl, t01, pathEl, pathLen) {
+    const p = pathEl.getPointAtLength(wrap01(t01) * pathLen);
+    circleEl.setAttribute("cx", p.x);
+    circleEl.setAttribute("cy", p.y);
+  }
+
+  // Suche die Position entlang der Bahn, die der Start/Ziel-Linie (x=500,y≈400) am nächsten ist.
+  function findClosestRatioToPoint(x, y, path, pathLen) {
+    let bestI = 0;
+    let bestD = Infinity;
+    const step = Math.max(2, Math.floor(pathLen / 800));
+    for (let i = 0; i <= pathLen; i += step) {
+      const p = path.getPointAtLength(i);
+      const dx = p.x - x, dy = p.y - y;
+      const d = dx*dx + dy*dy;
+      if (d < bestD) { bestD = d; bestI = i; }
+    }
+    return bestI / pathLen;
+  }
+
+  const startRatio = findClosestRatioToPoint(500, 400, laneMain, lenMain);
+
+  function fmtTime(sec){
+    const m = Math.floor(sec / 60);
+    const s = Math.round(sec - m * 60);
+    return `${m}:${String(s).padStart(2,"0")}`;
+  }
+
+  function recalc() {
+    const secA = parsePaceToSecPerKm(paceAEl.value);
+    const secB = parsePaceToSecPerKm(paceBEl.value);
+
+    if (!Number.isFinite(secA) || secA <= 0 || !Number.isFinite(secB) || secB <= 0) {
       timesEl.textContent = "Bitte Pace korrekt eingeben (z.B. 5:00 oder 4:35).";
       return false;
     }
 
-    vA = 1000 / secPerKmA; // m/s
-    vB = 1000 / secPerKmB;
+    vA = 1000 / secA; // m/s
+    vB = 1000 / secB;
 
-    const lapA = LAP_M / vA; // seconds
+    const lapA = LAP_M / vA;
     const lapB = LAP_M / vB;
-
-    const fmt = (sec) => {
-      const m = Math.floor(sec / 60);
-      const s = Math.round(sec - m * 60);
-      return `${m}:${String(s).padStart(2,"0")}`;
-    };
-
-    timesEl.textContent =
-      `A: ${fmt(lapA)} pro 400m  |  B: ${fmt(lapB)} pro 400m`;
-
+    timesEl.textContent = `A: ${fmtTime(lapA)} pro 400m  |  B: ${fmtTime(lapB)} pro 400m`;
     return true;
   }
 
   function updateGap() {
-    // forward gap along track from A to B, and absolute smallest distance
-    const d = wrap01(progB - progA); // [0,1)
-    const metersForward = d * LAP_M;
-    const metersBackward = (1 - d) * LAP_M;
-    const shortest = Math.min(metersForward, metersBackward);
+    // Abstand entlang der Bahn (vorwärts) + kleinster Abstand
+    const d = wrap01(progB - progA);      // [0,1)
+    const forward = d * LAP_M;
+    const backward = (1 - d) * LAP_M;
+    const shortest = Math.min(forward, backward);
 
-    // also show signed "B ahead" if d in (0,0.5], else A ahead
-    let leadText;
-    if (d === 0) leadText = "Gleichauf";
-    else if (d <= 0.5) leadText = `B ist vorne: +${metersForward.toFixed(1)} m`;
-    else leadText = `A ist vorne: +${metersBackward.toFixed(1)} m`;
+    let lead;
+    if (d === 0) lead = "Gleichauf";
+    else if (d <= 0.5) lead = `B ist vorne: +${forward.toFixed(1)} m`;
+    else lead = `A ist vorne: +${backward.toFixed(1)} m`;
 
-    gapEl.textContent = `${leadText}  (kleinster Abstand: ${shortest.toFixed(1)} m)`;
+    gapEl.textContent = `${lead}  (kleinster Abstand: ${shortest.toFixed(1)} m)`;
   }
 
   function reset() {
-    running = false;
-    paused = false;
+    running = false; paused = false;
     startBtn.disabled = false;
     pauseBtn.disabled = true;
     pauseBtn.textContent = "Pause";
 
-    progA = 0;
-    progB = 0;
-    setRunnerPos(runnerA, progA);
-    setRunnerPos(runnerB, progB);
-    updateGap();
-    recalc();
+    // Start/Ziel-Position ermitteln und beide Läufer dort platzieren
+    progA = startRatio; progB = startRatio;
+    setPos(runnerA, progA, laneMain, lenMain);
+    setPos(runnerB, progB, laneMain, lenMain);
+
+    timesEl.textContent = "–";
+    gapEl.textContent = "–";
   }
 
   function tick(ts) {
@@ -239,12 +274,11 @@
     lastFrame = ts;
 
     if (!paused) {
-      // progress per second: (m/s) / 400m
       progA = wrap01(progA + (vA / LAP_M) * dt);
       progB = wrap01(progB + (vB / LAP_M) * dt);
 
-      setRunnerPos(runnerA, progA);
-      setRunnerPos(runnerB, progB);
+      setPos(runnerA, progA, laneMain, lenMain);
+      setPos(runnerB, progB, laneMain, lenMain);
       updateGap();
     }
 
@@ -253,13 +287,10 @@
 
   startBtn.addEventListener("click", () => {
     if (!recalc()) return;
-
-    running = true;
-    paused = false;
+    running = true; paused = false;
     startBtn.disabled = true;
     pauseBtn.disabled = false;
     pauseBtn.textContent = "Pause";
-
     lastFrame = performance.now();
     requestAnimationFrame(tick);
   });
@@ -272,8 +303,11 @@
 
   resetBtn.addEventListener("click", reset);
 
-  // initial positions
-  reset();
+  // initial: beide Läufer auf Start/Ziel platzieren
+  setPos(runnerA, startRatio, laneMain, lenMain);
+  setPos(runnerB, startRatio, laneMain, lenMain);
+  progA = startRatio; progB = startRatio;
+  updateGap();
 </script>
 </body>
 </html>
